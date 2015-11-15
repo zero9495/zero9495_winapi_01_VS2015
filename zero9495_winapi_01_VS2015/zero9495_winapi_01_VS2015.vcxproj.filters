@@ -71,5 +71,8 @@
     <ClInclude Include="MyTriangle.h">
       <Filter>Заголовочные файлы\Figures</Filter>
     </ClInclude>
+    <ClInclude Include="Workspace.h">
+      <Filter>Заголовочные файлы</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

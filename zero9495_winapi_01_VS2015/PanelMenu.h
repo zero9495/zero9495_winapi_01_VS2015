@@ -54,6 +54,7 @@ PanelMenu::PanelMenu() : PanelMenu(1000)
 PanelMenu::PanelMenu(int cyClient)
 {
 	txt = new ButtonWithText(70, 50, "MM_TEXT");
+	//txt->TurnOn();
 	isotr = new ButtonWithText(70, 100, "MM_ISOTROPIC");
 	anisotr = new ButtonWithText(70, 150, "MM_ANISOTROPIC");
 	arrows = new Arrows(35, 300);
