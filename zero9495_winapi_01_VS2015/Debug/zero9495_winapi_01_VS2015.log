@@ -1,0 +1,27 @@
+﻿Сборка начата 15.11.2015 20:54:19.
+     1>Проект "c:\Users\Николай\documents\visual studio 2015\Projects\zero9495_winapi_01_VS2015\zero9495_winapi_01_VS2015\zero9495_winapi_01_VS2015.vcxproj" в узле 2 (целевые объекты Build).
+     1>ClCompile:
+         C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\bin\CL.exe /c /ZI /nologo /W3 /WX- /sdl /Od /Oy- /D WIN32 /D _DEBUG /D _WINDOWS /D _MBCS /Gm /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"Debug\\" /Fd"Debug\vc140.pdb" /Gd /TP /analyze- /errorReport:prompt Figure.cpp ListFigure.cpp MyEllipse.cpp MyRectangle.cpp MyTriangle.cpp zero9495_winapi_01_01.cpp
+         zero9495_winapi_01_01.cpp
+     1>c:\users\николай\documents\visual studio 2015\projects\zero9495_winapi_01_vs2015\zero9495_winapi_01_vs2015\buttonwithtext.h(55): warning C4101: cf: неиспользованная локальная переменная
+     1>c:\users\николай\documents\visual studio 2015\projects\zero9495_winapi_01_vs2015\zero9495_winapi_01_vs2015\zero9495_winapi_01_01.cpp(218): warning C4244: +=: преобразование "double" в "int", возможна потеря данных
+         MyTriangle.cpp
+         MyRectangle.cpp
+         MyEllipse.cpp
+         ListFigure.cpp
+         Figure.cpp
+         Создание кода...
+     1>c:\users\николай\documents\visual studio 2015\projects\zero9495_winapi_01_vs2015\zero9495_winapi_01_vs2015\zero9495_winapi_01_01.cpp(430): warning C4715: WndProc: значение возвращается не при всех путях выполнения
+       Link:
+         C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\bin\link.exe /ERRORREPORT:PROMPT /OUT:"c:\users\николай\documents\visual studio 2015\Projects\zero9495_winapi_01_VS2015\Debug\zero9495_winapi_01_VS2015.exe" /INCREMENTAL /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /Debug /PDB:"c:\users\николай\documents\visual studio 2015\Projects\zero9495_winapi_01_VS2015\Debug\zero9495_winapi_01_VS2015.pdb" /SUBSYSTEM:WINDOWS /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"c:\users\николай\documents\visual studio 2015\Projects\zero9495_winapi_01_VS2015\Debug\zero9495_winapi_01_VS2015.lib" /MACHINE:X86 Debug\Figure.obj
+         Debug\ListFigure.obj
+         Debug\MyEllipse.obj
+         Debug\MyRectangle.obj
+         Debug\MyTriangle.obj
+         Debug\zero9495_winapi_01_01.obj
+         zero9495_winapi_01_VS2015.vcxproj -> c:\users\николай\documents\visual studio 2015\Projects\zero9495_winapi_01_VS2015\Debug\zero9495_winapi_01_VS2015.exe
+     1>Сборка проекта "c:\Users\Николай\documents\visual studio 2015\Projects\zero9495_winapi_01_VS2015\zero9495_winapi_01_VS2015\zero9495_winapi_01_VS2015.vcxproj" завершена (целевые объекты Build).
+
+Сборка успешно завершена.
+
+Затраченное время: 00:00:03.07
