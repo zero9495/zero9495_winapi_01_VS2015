@@ -70,6 +70,8 @@
 //#include <vld.h>
 #include "Sight.h"
 #include "PanelMenu.h"
+#include "Workspace.h"
+#include <tchar.h>
 //#include <gdiplus.h>
 //#pragma comment(lib, "gdiplus.lib")
 //using namespace Gdiplus;
@@ -77,8 +79,26 @@
 int Figure::count = 0;
 
 HINSTANCE hInst; //дескриптор экземпляра приложения. От фразы handle instance
-char szAppName[] = "zero9495_winapi_01";
-char szAppTitle[] = "zero9495_winapi_01";
+TCHAR szAppName[] = _T("zero9495_winapi_01");
+TCHAR szAppTitle[] = _T("zero9495_winapi_01");
+
+HWND hWndPanelMenu;
+HWND hWndWorkspace;
+
+static COLORREF selectedColorBrush;
+static COLORREF selectedColorPen;
+static int xWindow;
+static int yWindow;
+static int currentMode;
+static int xViewExt;
+static int yViewExt;
+static int xWinExt;
+static int yWinExt;
+
+#define WIDTH_PANEL_MENU 140
+#define CX_CLIENT_START 1000
+#define CY_CLIENT_START 500
+#define IDT_TIMER1 1
 
 /*
 Вспомогательные типы данных используются в некоторых функциях.
@@ -92,10 +112,12 @@ LPARAM – тип для описания lParam (long parameter). Используются вместе с wparam 
 LRESULT – значение, возвращаемое оконной процедурой имеет тип long.
 WPARAM – тип для описания wParam (word parameter). Используются вместе с lParam в некоторых функциях.
 */
+LRESULT CALLBACK PanelMenuProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+LRESULT CALLBACK WorkspaceProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 LRESULT WINAPI WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
 // Основная функция - аналог int main() в консольном приложении:
-int APIENTRY WinMain(HINSTANCE hInstance, // дескриптор экземпляра приложения
+int APIENTRY _tWinMain(HINSTANCE hInstance, // дескриптор экземпляра приложения
 	HINSTANCE hPrevInstance, // в Win32 не используется
 	LPSTR lpCmdLine, // нужен для запуска окна в режиме командной строки
 	int nCmdShow) // режим отображения окна
@@ -108,7 +130,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, // дескриптор экземпляра приложения
 	wc.cbSize = sizeof(wc); // величина структуры (в байтах)
 	wc.hIcon = LoadIcon(NULL, IDI_APPLICATION); // дескриптор значка
 	wc.hCursor = LoadCursor(NULL, IDC_ARROW); // .... курсора мыши
-	wc.style = NULL; // стиль класса окошка
+	wc.style = CS_DBLCLKS; // стиль класса окошка
 	wc.hInstance = hInstance;
 	wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1); // Дескриптор кисти фона
 	wc.lpszMenuName = NULL; // указатель на const-строку, содержащюю имя меню, применяемого для класса
@@ -121,17 +143,17 @@ int APIENTRY WinMain(HINSTANCE hInstance, // дескриптор экземпляра приложения
 	if (!RegisterClassEx(&wc))
 	{
 		// в случае отсутствия регистрации класса:
-		MessageBox(NULL, "Не получилось зарегистрировать класс!", "Ошибка", MB_OK);
+		MessageBox(NULL, _T("Не получилось зарегистрировать класс!"), _T("Ошибка"), MB_OK);
 		return NULL; // возвращаем, следовательно, выходим из WinMain
 	}
-
+	
 	hWnd = CreateWindow(szAppName, // имя класса
 		szAppTitle, // имя окна (то что сверху)
 		WS_OVERLAPPEDWINDOW, // режимы отображения окошка
 		CW_USEDEFAULT, // положение окна по оси х (по умолчанию)
 		CW_USEDEFAULT, // позиция окна по оси у (раз дефолт в х, то писать не нужно)
-		CW_USEDEFAULT, // ширина окошка (по умолчанию)
-		CW_USEDEFAULT, // высота окна (раз дефолт в ширине, то писать не нужно)
+		CX_CLIENT_START, // ширина окошка (по умолчанию)
+		CY_CLIENT_START, // высота окна (раз дефолт в ширине, то писать не нужно)
 		NULL, // дескриптор родительского окошка (у нас нет род. окон)
 		NULL, // дескриптор меню (у нас его нет)
 		hInst, // .... экземпляра приложения
@@ -140,7 +162,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, // дескриптор экземпляра приложения
 	if (!hWnd)
 	{
 		// в случае некорректного создания окна (неверные параметры и тп):
-		MessageBox(NULL, "Не получилось создать окно!", "Ошибка", MB_OK);
+		MessageBox(NULL, _T("Не получилось создать окно!"), _T("Ошибка"), MB_OK);
 		return NULL; // выходим из приложения
 	}
 
@@ -149,6 +171,90 @@ int APIENTRY WinMain(HINSTANCE hInstance, // дескриптор экземпляра приложения
 								//функции WinMain(), а в последующие разы можно вписывать свои данные
 	UpdateWindow(hWnd); //отвечает за обновления окошка на экране при сворачиваниях или при динамической информации. 
 						//Его параметр – всё тот же дескриптор окна.
+
+	//////////////////////////////////////////////////////////////////////////////////
+	
+	WNDCLASSEX wcPanelMenu;
+	wcPanelMenu.lpfnWndProc = (WNDPROC)PanelMenuProc;
+	wcPanelMenu.hInstance = hInstance;
+	wcPanelMenu.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+	wcPanelMenu.lpszClassName = "WClassPanelMenu";
+	wcPanelMenu.hCursor = LoadCursor(NULL, IDC_ARROW);
+	wcPanelMenu.cbSize = sizeof(wc); // величина структуры (в байтах)
+	wcPanelMenu.hIcon = LoadIcon(NULL, IDI_APPLICATION); // дескриптор значка
+	wcPanelMenu.style = NULL; // стиль класса окошка
+	wcPanelMenu.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1); // Дескриптор кисти фона
+	wcPanelMenu.lpszMenuName = NULL; // указатель на const-строку, содержащюю имя меню, применяемого для класса
+	wcPanelMenu.cbClsExtra = 0; // число освобождаемых байтов при создании экземпляра приложения
+	wcPanelMenu.cbWndExtra = 0; // число освобождаемых байтов в конце структуры
+	wcPanelMenu.hIconSm = 0;
+
+	if (!RegisterClassEx(&wcPanelMenu))
+	{
+		// в случае отсутствия регистрации класса:
+		MessageBox(NULL, _T("Не получилось зарегистрировать класс!"), _T("Ошибка"), MB_OK);
+		return NULL; // возвращаем, следовательно, выходим из WinMain
+	}
+
+	hWndPanelMenu = CreateWindowEx(0, _T("WClassPanelMenu"), (LPCTSTR)NULL,
+		WS_CHILD,
+		0, 0,
+		WIDTH_PANEL_MENU, 
+		CY_CLIENT_START, 
+		hWnd, 0, hInst, NULL);
+
+	if (!hWndPanelMenu)
+	{
+		// в случае некорректного создания окна (неверные параметры и тп):
+		MessageBox(NULL, _T("Не получилось создать окно!"), _T("Ошибка"), MB_OK);
+		return NULL; // выходим из приложения
+	}
+
+	ShowWindow(hWndPanelMenu, SW_NORMAL);
+	UpdateWindow(hWndPanelMenu);
+
+	///////////////////////////////////////////////////////////////////////////////////
+
+	WNDCLASSEX wcWorkspace;
+	wcWorkspace.lpfnWndProc = (WNDPROC)WorkspaceProc;
+	wcWorkspace.hInstance = hInstance;
+	wcWorkspace.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+	wcWorkspace.lpszClassName = _T("WClassWorkspace");
+	wcWorkspace.hCursor = LoadCursor(NULL, IDC_ARROW);
+	wcWorkspace.cbSize = sizeof(wc); // величина структуры (в байтах)
+	wcWorkspace.hIcon = LoadIcon(NULL, IDI_APPLICATION); // дескриптор значка
+	wcWorkspace.style = CS_DBLCLKS; // стиль класса окошка
+	wcWorkspace.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1); // Дескриптор кисти фона
+	wcWorkspace.lpszMenuName = NULL; // указатель на const-строку, содержащюю имя меню, применяемого для класса
+	wcWorkspace.cbClsExtra = 0; // число освобождаемых байтов при создании экземпляра приложения
+	wcWorkspace.cbWndExtra = 0; // число освобождаемых байтов в конце структуры
+	wcWorkspace.hIconSm = 0;
+
+	if (!RegisterClassEx(&wcWorkspace))
+	{
+		// в случае отсутствия регистрации класса:
+		MessageBox(NULL, _T("Не получилось зарегистрировать класс!"), _T("Ошибка"), MB_OK);
+		return NULL; // возвращаем, следовательно, выходим из WinMain
+	}
+
+	hWndWorkspace = CreateWindowEx(0, _T("WClassWorkspace"), (LPCTSTR)NULL,
+		WS_CHILD | CS_DBLCLKS,
+		WIDTH_PANEL_MENU, 0,
+		CX_CLIENT_START, 
+		CY_CLIENT_START, 
+		hWnd, 0, hInst, NULL);
+
+	if (!hWndWorkspace)
+	{
+		// в случае некорректного создания окна (неверные параметры и тп):
+		MessageBox(NULL, _T("Не получилось создать окно!"), _T("Ошибка"), MB_OK);
+		return NULL; // выходим из приложения
+	}
+
+	ShowWindow(hWndWorkspace, SW_NORMAL);
+	UpdateWindow(hWndWorkspace);
+
+	///////////////////////////////////////////////////////////////////////////////////
 
 	while (GetMessage(&msg, // указатель на структуру MSG
 		NULL, // дескриптор окошка 
@@ -169,8 +275,8 @@ ListFigure* CreateFigures()
 	int width = 50;
 	int space = width / 5;
 
-	int x = 50;
-	int y = 50;
+	int x = 0;
+	int y = 0;
 	COLORREF hP = RGB(238, 238, 238);
 	COLORREF hB = RGB(40, 57, 60);
 
@@ -235,30 +341,48 @@ ListFigure* CreateFigures()
 	return a;
 }
 
-LRESULT WINAPI WndProc(HWND hWnd, // дескриптор окошка
+void SetDirection(POINT direction)
+{
+	if (direction.x == 3)
+	{
+		xWinExt = 1;
+	}
+	else
+	{
+		xWinExt = -1;
+	}
+
+	if (direction.y == 6)
+	{
+		yWinExt = 1;
+	}
+	else
+	{
+		yWinExt = -1;
+	}
+	//xViewExt = 1; !!!!!!!!!!!!!!!!!Использовать для изменения масштаба!!!!!!!!!!!!!!!!!!!!!!!!!!
+	//yViewExt = 1;
+}
+
+LRESULT CALLBACK WorkspaceProc(HWND hWnd, // дескриптор окошка
 	UINT uMsg, // сообщение, посылаемое ОС
 	WPARAM wParam, // параметры
 	LPARAM lParam) // сообщений, для последующего обращения
 {
-	PAINTSTRUCT ps; //в структуре информация об окне для прорисовки
-	//RECT rect; //прямоугольная область окна
-	COLORREF colorText = RGB(255, 0, 0); //цвет текста										 
+	PAINTSTRUCT ps; //в структуре информация об окне для прорисовки	
 	HDC hdc; // Объявляем контекст устройства.
 	static ListFigure* a;
 	static ListFigure* b;
 	static int cxClient; // Ширина окна
 	static int cyClient; // Высота окна
-	static COLORREF selectedColorBrush;
-	static COLORREF selectedColorPen;
+	
 	static int radius;
-	static int xWindow;
-	static int yWindow;
 
-	int x = 0;
-	int y = 0;
+	static int x;
+	static int y;
 
-	static PanelMenu* panelMenu;
 	static Sight* sight;
+	static Workspace* workspace;
 
 	switch (uMsg)
 	{
@@ -267,19 +391,533 @@ LRESULT WINAPI WndProc(HWND hWnd, // дескриптор окошка
 		a = CreateFigures();
 		b = new ListFigure[1];
 
-		panelMenu = new PanelMenu(cyClient);
-		sight = new Sight(100, 300);
+		sight = new Sight(0,0);
+		workspace = new Workspace(
+			-CX_CLIENT_START, 
+			-CY_CLIENT_START, 
+			CX_CLIENT_START, 
+			CY_CLIENT_START);
 
-		xWindow = 300;
-		yWindow = 300;
-		
+		xWindow = CX_CLIENT_START / 3;
+		yWindow = CY_CLIENT_START / 2;
+
+		xViewExt = 1;
+		yViewExt = 1;
+		xWinExt = 1;
+		yWinExt = 1;
+
+		x = 0;
+		y = 0;
+
+		currentMode = MM_TEXT;
+
 		selectedColorBrush = RGB(40, 57, 60);
 		selectedColorPen = RGB(238, 238, 238);
-		radius = 50;
+		radius = 70;
+		break;
 	}
 	case WM_PAINT:
 	{
 		hdc = BeginPaint(hWnd, &ps); // Присоединяем контекст устройства к окну.
+		SetMapMode(hdc, currentMode);
+		SetViewportOrgEx(hdc, xWindow, yWindow, NULL);
+		if ((currentMode == MM_ISOTROPIC) || (currentMode == MM_ANISOTROPIC))
+		{
+			SetWindowExtEx(hdc, xWinExt, yWinExt, NULL);
+			SetViewportExtEx(hdc, xViewExt, yViewExt, NULL);
+		}
+
+		b->Paint(hdc);
+
+		EndPaint(hWnd, &ps);
+		break;
+	}
+	case WM_SIZE:
+	{
+		cxClient = LOWORD(lParam);
+		cyClient = HIWORD(lParam);
+
+		hdc = GetDC(hWnd);
+		SetMapMode(hdc, currentMode);
+		if ((currentMode == MM_ISOTROPIC) || (currentMode == MM_ANISOTROPIC))
+		{
+			SetWindowExtEx(hdc, xWinExt, yWinExt, NULL);
+			SetViewportExtEx(hdc, xViewExt, yViewExt, NULL);
+		}
+
+		SetViewportOrgEx(hdc, xWindow, yWindow, NULL);
+		b->Paint(hdc);
+
+		workspace->ChangeSize(cxClient - WIDTH_PANEL_MENU, cyClient);
+
+		break;
+	}
+	case WM_PASTE:
+	{
+		b->AddElemToEnd(a);
+		break;
+	}
+	case WM_KEYDOWN:
+	{
+		WORD nKey = LOWORD(wParam);
+		switch (nKey)
+		{
+		case _T('o'):
+		{
+			SendMessage(hWndWorkspace, WM_TIMER, IDT_TIMER1, lParam);
+			break;
+		}
+		}
+	}
+	case WM_TIMER:
+	{
+		switch (wParam)
+		{
+		case IDT_TIMER1:
+		{
+			HDC hdc = GetDC(hWnd);
+			SetMapMode(hdc, currentMode);
+			SetWindowExtEx(hdc, xWinExt, yWinExt, NULL);
+			SetViewportExtEx(hdc, xViewExt, yViewExt, NULL);
+
+			//x = LOWORD(lParam); //узнаём координаты
+			//y = HIWORD(lParam);
+
+			SetViewportOrgEx(hdc, xWindow, yWindow, NULL);
+			MyRectangle* t = 0;
+			if (currentMode == MM_TEXT)
+			{
+				t = new MyRectangle(
+					selectedColorPen,
+					selectedColorBrush,
+					x - radius - xWindow,
+					y - radius - yWindow,
+					x + radius - xWindow,
+					y + radius - yWindow);
+			}
+			else if (currentMode == MM_ISOTROPIC)
+			{
+				t = new MyRectangle(
+					selectedColorPen,
+					selectedColorBrush,
+					(x - radius - xWindow) * xWinExt,
+					(y - radius - yWindow) * yWinExt,
+					(x + radius - xWindow) * xWinExt,
+					(y + radius - yWindow) * yWinExt);
+			}
+			else if (currentMode == MM_ANISOTROPIC)
+			{
+				t = new MyRectangle(
+					selectedColorPen,
+					selectedColorBrush,
+					(x - radius - xWindow) * xWinExt,
+					(y - radius - yWindow) * yWinExt,
+					(x + radius - xWindow) * xWinExt,
+					(y + radius - yWindow) * yWinExt);
+			}
+			b->AddElemToEnd(t);
+			delete t;
+
+			b->Paint(hdc);
+			KillTimer(hWnd, IDT_TIMER1);
+			break;
+		}
+		}
+		break;
+	}
+	case WM_LBUTTONDBLCLK:
+	{
+		HDC hdc = GetDC(hWnd);
+		SetMapMode(hdc, currentMode);
+		SetWindowExtEx(hdc, xWinExt, yWinExt, NULL);
+		SetViewportExtEx(hdc, xViewExt, yViewExt, NULL);
+
+		x = LOWORD(lParam); //узнаём координаты
+		y = HIWORD(lParam);
+
+		SetViewportOrgEx(hdc, xWindow, yWindow, NULL);
+		MyTriangle* t = 0;
+		if (currentMode == MM_TEXT)
+		{
+			t = new MyTriangle(selectedColorPen,
+				selectedColorBrush,
+				x - radius - xWindow,
+				y - radius - yWindow,
+				x + radius - xWindow,
+				y - yWindow,
+				x - radius - xWindow,
+				y + radius - yWindow);
+
+			/*t = new MyRectangle(
+				selectedColorPen,
+				selectedColorBrush,
+				x - radius - xWindow,
+				y - radius - yWindow,
+				x + radius - xWindow,
+				y + radius - yWindow);*/
+		}
+		else if (currentMode == MM_ISOTROPIC)
+		{
+			t = new MyTriangle(selectedColorPen,
+				selectedColorBrush,
+				(x - radius - xWindow) * xWinExt,
+				(y - radius - yWindow) * yWinExt,
+				(x + radius - xWindow) * xWinExt,
+				(y - yWindow) * yWinExt,
+				(x - radius - xWindow) * xWinExt,
+				(y + radius - yWindow) * yWinExt);
+
+			/*t = new MyRectangle(
+				selectedColorPen,
+				selectedColorBrush,
+				(x - radius - xWindow) * xWinExt,
+				(y - radius - yWindow) * yWinExt,
+				(x + radius - xWindow) * xWinExt,
+				(y + radius - yWindow) * yWinExt);*/
+		}
+		else if (currentMode == MM_ANISOTROPIC)
+		{
+			t = new MyTriangle(selectedColorPen,
+				selectedColorBrush,
+				(x - radius - xWindow) * xWinExt,
+				(y - radius - yWindow) * yWinExt,
+				(x + radius - xWindow) * xWinExt,
+				(y - yWindow) * yWinExt,
+				(x - radius - xWindow) * xWinExt,
+				(y + radius - yWindow) * yWinExt);
+
+			/*t = new MyRectangle(
+				selectedColorPen,
+				selectedColorBrush,
+				(x - radius - xWindow) * xWinExt,
+				(y - radius - yWindow) * yWinExt,
+				(x + radius - xWindow) * xWinExt,
+				(y + radius - yWindow) * yWinExt);*/
+		}
+		b->AddElemToEnd(t);
+		delete t;
+
+		b->Paint(hdc);
+
+		KillTimer(hWnd, IDT_TIMER1);
+		break;
+	}
+	case WM_LBUTTONDOWN:
+	{
+		SetTimer(hWnd,             // дескриптор главного окна
+			IDT_TIMER1,            // идентификатор таймера
+			200,                 // 10-секундный интервал
+			(TIMERPROC)NULL);	
+		
+		x = LOWORD(lParam); //узнаём координаты
+		y = HIWORD(lParam);
+
+		break;
+	}
+	case WM_RBUTTONDOWN:
+	{
+		HDC hdc = GetDC(hWnd);
+		SetMapMode(hdc, currentMode);
+		SetWindowExtEx(hdc, xWinExt, yWinExt, NULL);
+		SetViewportExtEx(hdc, xViewExt, yViewExt, NULL);
+
+		x = LOWORD(lParam); //узнаём координаты
+		y = HIWORD(lParam);
+
+		SetViewportOrgEx(hdc, xWindow, yWindow, NULL);
+		MyEllipse* t = 0;
+		if (currentMode == MM_TEXT)
+		{
+			t = new MyEllipse(
+				selectedColorPen,
+				selectedColorBrush,
+				x - radius - xWindow,
+				y - radius - yWindow,
+				x + radius - xWindow,
+				y + radius - yWindow);
+		}
+		else if (currentMode == MM_ISOTROPIC)
+		{
+			t = new MyEllipse(
+				selectedColorPen,
+				selectedColorBrush,
+				(x - radius - xWindow) * xWinExt,
+				(y - radius - yWindow) * yWinExt,
+				(x + radius - xWindow) * xWinExt,
+				(y + radius - yWindow) * yWinExt);
+		}
+		else if (currentMode == MM_ANISOTROPIC)
+		{
+			t = new MyEllipse(
+				selectedColorPen,
+				selectedColorBrush,
+				(x - radius - xWindow) * xWinExt,
+				(y - radius - yWindow) * yWinExt,
+				(x + radius - xWindow) * xWinExt,
+				(y + radius - yWindow) * yWinExt);
+		}
+		b->AddElemToEnd(t);
+		delete t;
+
+		b->Paint(hdc);
+		break;
+	}
+	case WM_LBUTTONUP:
+	{
+		break;
+	}
+	case WM_MOUSEMOVE:
+	{
+		if (sight->GetState())
+		{
+			HDC hdc = GetDC(hWnd);
+			SetMapMode(hdc, currentMode);
+			if ((currentMode == MM_ISOTROPIC) || (currentMode == MM_ANISOTROPIC))
+			{
+				SetWindowExtEx(hdc, xWinExt, yWinExt, NULL);
+				SetViewportExtEx(hdc, xViewExt, yViewExt, NULL);
+			}
+
+			x = LOWORD(lParam); //узнаём координаты
+			y = HIWORD(lParam);
+
+			sight->ChangeSight(xWindow, yWindow, x, y);
+			InvalidateRect(hWndWorkspace, NULL, TRUE);
+		}
+
+		break;
+	}
+	case WM_MBUTTONDOWN:
+	{
+		HDC hdc = GetDC(hWnd);
+		SetMapMode(hdc, currentMode);
+		if ((currentMode == MM_ISOTROPIC) || (currentMode == MM_ANISOTROPIC))
+		{
+			SetWindowExtEx(hdc, xWinExt, yWinExt, NULL);
+			SetViewportExtEx(hdc, xViewExt, yViewExt, NULL);
+		}
+
+		x = LOWORD(lParam); //узнаём координаты
+		y = HIWORD(lParam);
+
+		sight->TurnOn();
+		sight->SetCoordDown(x, y);
+
+		break;
+	}
+	case WM_MBUTTONUP:
+	{
+		sight->TurnOff();
+		break;
+	}
+	case WM_CLEAR:
+	{
+		HDC hdc = GetDC(hWnd);
+
+		SetWindowExtEx(hdc, xWinExt, yWinExt, NULL);
+		SetViewportExtEx(hdc, xViewExt, yViewExt, NULL);
+
+		workspace->Clear(hdc, xViewExt, yViewExt, xWinExt, yWinExt);
+		break;
+	}
+	case WM_DESTROY:
+	{
+		delete[] a;
+		delete[] b;
+		delete[] sight;
+		delete workspace;
+		PostQuitMessage(NULL); // отправляем WinMain() сообщение WM_QUIT
+		break;
+	}
+	default:
+		return DefWindowProc(hWnd, uMsg, wParam, lParam);
+	}
+}
+
+LRESULT CALLBACK PanelMenuProc(HWND hWnd, // дескриптор окошка
+	UINT uMsg, // сообщение, посылаемое ОС
+	WPARAM wParam, // параметры
+	LPARAM lParam) // сообщений, для последующего обращения
+{
+	PAINTSTRUCT ps; //в структуре информация об окне для прорисовки									 
+	HDC hdc; // Объявляем контекст устройства.
+	static int cxClient; // Ширина окна
+	static int cyClient; // Высота окна
+	static COLORREF selectedColorBrush;
+	static COLORREF selectedColorPen;
+	
+	int x = 0;
+	int y = 0;
+
+	static PanelMenu* panelMenu;
+
+	switch (uMsg)
+	{
+	case WM_CREATE:
+	{
+		panelMenu = new PanelMenu(cyClient);
+		
+		xWindow = 0;
+		yWindow = 0;
+
+		xViewExt = -10;
+		yViewExt = 10;
+		xWinExt = 10;
+		yWinExt = -10;
+
+		selectedColorBrush = RGB(40, 57, 60);
+		selectedColorPen = RGB(238, 238, 238);
+		break;
+	}
+	case WM_PAINT:
+	{
+		hdc = BeginPaint(hWnd, &ps); // Присоединяем контекст устройства к окну.
+		SetMapMode(hdc, MM_TEXT);
+
+		panelMenu->Paint(hdc);
+
+		EndPaint(hWnd, &ps);
+		break;
+	}
+	case WM_SIZE:
+	{
+		cyClient = HIWORD(lParam);
+
+		hdc = GetDC(hWnd);
+		SetMapMode(hdc, MM_TEXT);
+		
+		panelMenu->SetCYClient(cyClient);
+		panelMenu->Paint(hdc);
+		
+		break;
+	}
+	case WM_LBUTTONDOWN:
+	{
+		HDC hdc = GetDC(hWnd);
+		SetMapMode(hdc, MM_TEXT);
+
+		x = LOWORD(lParam); //узнаём координаты
+		y = HIWORD(lParam);
+
+		if (panelMenu->OnSetMapModeDOWN(xWindow, yWindow, x, y, hdc))
+		{
+			currentMode = GetMapMode(hdc);
+			SetMapMode(hdc, MM_TEXT);
+			SendMessage(hWndWorkspace, WM_PASTE, wParam, lParam);
+			InvalidateRect(hWndWorkspace, NULL, TRUE);
+		}
+		else
+		{
+			SetDirection(panelMenu->OnChangeDirectionDOWN(x, y, hdc));
+			InvalidateRect(hWndWorkspace, NULL, TRUE);
+		}
+		panelMenu->Paint(hdc);
+		SendMessage(hWndWorkspace, WM_PAINT, wParam, lParam);
+
+		break;
+	}
+	case WM_LBUTTONUP:
+	{
+		panelMenu->OnMenuUP();
+		panelMenu->Paint(hdc);
+		SendMessage(hWndWorkspace, WM_PAINT, wParam, lParam);
+		break;
+	}
+	case WM_MOUSEMOVE:
+	{
+		HDC hdc = GetDC(hWnd);
+		SetMapMode(hdc, MM_TEXT);
+		
+		x = LOWORD(lParam); //узнаём координаты
+		y = HIWORD(lParam);
+
+		if (panelMenu->OnMenuMOVE(x, y, hdc))
+		{
+			panelMenu->Paint(hdc);
+			SetDirection(panelMenu->OnChangeDirectionDOWN(x, y, hdc));
+			InvalidateRect(hWndWorkspace, NULL, TRUE);
+		}
+		
+		break;
+	}
+	case WM_MBUTTONDOWN:
+	{			
+		break;
+	}
+	case WM_MBUTTONUP:
+	{		
+		break;
+	}
+	case WM_DESTROY:
+	{
+		delete panelMenu;
+		PostQuitMessage(NULL); // отправляем WinMain() сообщение WM_QUIT
+		break;
+	}
+	default:
+		return DefWindowProc(hWnd, uMsg, wParam, lParam);
+	}
+}
+
+LRESULT WINAPI WndProc(HWND hWnd, // дескриптор окошка
+	UINT uMsg, // сообщение, посылаемое ОС
+	WPARAM wParam, // параметры
+	LPARAM lParam) // сообщений, для последующего обращения
+{
+	PAINTSTRUCT ps; //в структуре информация об окне для прорисовки
+	//COLORREF colorText = RGB(255, 0, 0); //цвет текста										 
+	HDC hdc; // Объявляем контекст устройства.
+	//static ListFigure* a;
+	//static ListFigure* b;
+	//static int cxClient; // Ширина окна
+	//static int cyClient; // Высота окна
+	//static COLORREF selectedColorBrush;
+	//static COLORREF selectedColorPen;
+	//static int radius;		
+
+	//int x = 0;
+	//int y = 0;
+
+	//static PanelMenu* panelMenu;
+	//static Sight* sight;
+	//static Workspace* workspace;
+
+	switch (uMsg)
+	{
+	case WM_CREATE:
+	{
+		/*a = CreateFigures();
+		b = new ListFigure[1];
+
+		//panelMenu = new PanelMenu(cyClient);
+		ShowWindow(hWndPanelMenu, SW_NORMAL);
+		sight = new Sight(100, 300);
+		workspace = new Workspace(-cxClient, -cyClient, cxClient, cyClient);
+
+		xWindow = 0;
+		yWindow = 0;
+
+		xViewExt = -10;
+		yViewExt = 10;
+		xWinExt = 10;
+		yWinExt = -10;
+
+		currentMode = MM_TEXT;
+		
+		selectedColorBrush = RGB(40, 57, 60);
+		selectedColorPen = RGB(238, 238, 238);
+		radius = 70;*/
+		break;
+	}
+	case WM_PAINT:
+	{
+		/*hdc = BeginPaint(hWnd, &ps); // Присоединяем контекст устройства к окну.
+		SetMapMode(hdc, currentMode);
+		if ((currentMode == MM_ISOTROPIC) || (currentMode == MM_ANISOTROPIC))
+		{
+			SetWindowExtEx(hdc, xWinExt, yWinExt, NULL);
+			SetViewportExtEx(hdc, xViewExt, yViewExt, NULL);
+		}*/
 
 		/*int k = GetDeviceCaps(hdc, HORZSIZE); //Ширина, в миллиметрах, физического экрана. 
 		k = GetDeviceCaps(hdc, VERTSIZE); //Ширина, в миллиметрах, физического экрана. 
@@ -294,133 +932,208 @@ LRESULT WINAPI WndProc(HWND hWnd, // дескриптор окошка
 		SetViewportExtEx(hdc, -10, -10, NULL);
 		SetViewportOrgEx(hdc, 300, 300, NULL);*/
 
-		SetViewportOrgEx(hdc, xWindow, yWindow, NULL);
+		/*SetViewportOrgEx(hdc, xWindow, yWindow, NULL);
 
-		HPEN hPen = CreatePen(PS_SOLID, 1, RGB(40, 57, 60));
-		SelectObject(hdc, hPen);
-
-		Rectangle(hdc, -50, -50, 50, 50);
-
-		MoveToEx(hdc, 0, 0, NULL);
-		LineTo(hdc, 0, 10);
-		MoveToEx(hdc, 0, 0, NULL);
-		LineTo(hdc, 10, 0);
-
-		DeleteObject(hPen);
-
-		panelMenu->Paint(hdc);
+		//panelMenu->Paint(hdc, xViewExt,	yViewExt, xWinExt, yWinExt);
 		
-		EndPaint(hWnd, &ps);
+		EndPaint(hWnd, &ps);*/
 		break;
 	}
 	case WM_SIZE:
 	{
-		cxClient = LOWORD(lParam);
+		int cxClient = LOWORD(lParam);
+		int cyClient = HIWORD(lParam);
+				
+		/*SetWindowPos(hWndPanelMenu, HWND_TOP, 0, 0, cxClient, cyClient, SWP_NOOWNERZORDER); // SWP_NOMOVE | SWP_NOZORDER);
+		SetWindowPos(hWndWorkspace, HWND_TOP, 0, 0, cxClient, cyClient, SWP_NOOWNERZORDER);// SWP_NOMOVE | SWP_NOZORDER);
+		//InvalidateRect(hWndWorkspace, NULL, TRUE);
+
+		SendMessage(hWndWorkspace, WM_SIZE, wParam, lParam);
+		SendMessage(hWndPanelMenu, WM_SIZE, wParam, lParam);*/
+
+		MoveWindow(hWndPanelMenu, 0, 0, WIDTH_PANEL_MENU, cyClient, TRUE);
+		MoveWindow(hWndWorkspace, WIDTH_PANEL_MENU, 0, cxClient - WIDTH_PANEL_MENU, cyClient, TRUE);
+
+		/*cxClient = LOWORD(lParam);
 		cyClient = HIWORD(lParam);
 
 		hdc = GetDC(hWnd);
+		SetMapMode(hdc, currentMode);
+		if ((currentMode == MM_ISOTROPIC) || (currentMode == MM_ANISOTROPIC))
+		{
+			SetWindowExtEx(hdc, xWinExt, yWinExt, NULL);
+			SetViewportExtEx(hdc, xViewExt, yViewExt, NULL);
+		}
 
 		SetViewportOrgEx(hdc, xWindow, yWindow, NULL);
 		b->Paint(hdc);
 
-		panelMenu->SetCYClient(cyClient);
-		//panelMenu->Paint(hdc);
+		//panelMenu->SetCYClient(cyClient);
+		workspace->ChangeSize(cxClient, cyClient);*/
 
+		break;
+	}
+	case WM_KEYDOWN:
+	{
+		WORD nKey = LOWORD(wParam);
+		switch (nKey)
+		{
+		case 79:
+		{
+			SendMessage(hWndWorkspace, WM_TIMER, IDT_TIMER1, lParam);
+			break;
+		}
+		}
 		break;
 	}
 	case WM_LBUTTONDOWN:
 	{
-		HDC hdc = GetDC(hWnd);		
+		/*HDC hdc = GetDC(hWnd);		
+		SetMapMode(hdc, currentMode);
+		SetWindowExtEx(hdc, xWinExt, yWinExt, NULL);
+		SetViewportExtEx(hdc, xViewExt, yViewExt, NULL);
+		
 		x = LOWORD(lParam); //узнаём координаты
 		y = HIWORD(lParam);
 				
-		if ((x >= 0) && (x <= 140))
-		{
-			panelMenu->OnMenuDOWN(a, b, xWindow, yWindow, x, y, hdc);
-		}
-		else if (x > 140)
-		{
+		if ((x >= 0) && (x <= WIDTH_PANEL_MENU))
+		{*/
+			/*if (!panelMenu->OnMenuDOWN(a, b, xWindow, yWindow, x, y, hdc))
+			{
+				currentMode = GetMapMode(hdc);
+				if ((currentMode == MM_ISOTROPIC) || (currentMode == MM_ANISOTROPIC))
+				{
+					SetWindowExtEx(hdc, xWinExt, yWinExt, NULL);
+					SetViewportExtEx(hdc, xViewExt, yViewExt, NULL);
+				}
+				workspace->Clear(hdc, xViewExt, yViewExt, xWinExt, yWinExt);
+			}*/
+		/*}
+		else if (x > WIDTH_PANEL_MENU)
+		{			
 			SetViewportOrgEx(hdc, xWindow, yWindow, NULL);
-			MyEllipse* t = new MyEllipse(
-				selectedColorPen, 
-				selectedColorBrush, 
-				x - radius - xWindow,
-				y - radius - yWindow,
-				x + radius - xWindow,
-				y + radius - yWindow);
+			MyEllipse* t = 0;
+			if (currentMode == MM_TEXT)
+			{
+				t = new MyEllipse(
+					selectedColorPen,
+					selectedColorBrush,
+					x - radius - xWindow,
+					y - radius - yWindow,
+					x + radius - xWindow,
+					y + radius - yWindow);
+			}
+			else if (currentMode == MM_ISOTROPIC)
+			{
+				t = new MyEllipse(
+					selectedColorPen,
+					selectedColorBrush,
+					-(x - radius - xWindow),
+					-(y - radius - yWindow),
+					-(x + radius - xWindow),
+					-(y + radius - yWindow));
+			}
+			else if (currentMode == MM_ANISOTROPIC)
+			{
+				t = new MyEllipse(
+					selectedColorPen,
+					selectedColorBrush,
+					-(x - radius - xWindow),
+					-(y - radius - yWindow),
+					-(x + radius - xWindow),
+					-(y + radius - yWindow));
+			}			
 			b->AddElemToEnd(t);
-			b->Paint(hdc);
 			delete t;
 		}
 
-		panelMenu->Paint(hdc);
+		b->Paint(hdc);
+		//panelMenu->Paint(hdc, xViewExt, yViewExt, xWinExt, yWinExt);
+
+		currentMode = GetMapMode(hdc);*/
 
 		break;
 	}
 	case WM_LBUTTONUP:
 	{
-		panelMenu->OnMenuUP();
+		//panelMenu->OnMenuUP();
+
+		break;
 	}
 	case WM_MOUSEMOVE:
 	{
-		HDC hdc = GetDC(hWnd);
-		x = LOWORD(lParam); //узнаём координаты
-		y = HIWORD(lParam);
+		/*HDC hdc = GetDC(hWnd);
+		SetMapMode(hdc, currentMode);
+		if ((currentMode == MM_ISOTROPIC) || (currentMode == MM_ANISOTROPIC))
+		{
+			SetWindowExtEx(hdc, xWinExt, yWinExt, NULL);
+			SetViewportExtEx(hdc, xViewExt, yViewExt, NULL);
+		}
 
-		panelMenu->OnMenuMOVE(
+		x = LOWORD(lParam); //узнаём координаты
+		y = HIWORD(lParam);*/
+
+		/*panelMenu->OnMenuMOVE(
 			b, 
 			xWindow, yWindow,
 			cxClient,cyClient, 
-			x, y, hdc);
+			x, y, hdc);*/
 
-		if (x > 140)
+		/*if (x > WIDTH_PANEL_MENU)
 		{
 			if (sight->GetState())
 			{
 				sight->ChangeSight(xWindow, yWindow, x, y);
 				SetViewportOrgEx(hdc, xWindow, yWindow, NULL);
 
-				HBRUSH hBrush = CreateSolidBrush(RGB(255, 255, 255));
-				HPEN hPen = CreatePen(PS_SOLID, 1, RGB(255, 255, 255));
-				SelectObject(hdc, hBrush);
-				SelectObject(hdc, hPen);
+				workspace->Clear(hdc, xViewExt, yViewExt, xWinExt, yWinExt);
 
-				Rectangle(hdc, 140 - xWindow, -yWindow, cxClient, cyClient);
-
-				DeleteObject(hBrush);
-				DeleteObject(hPen);
+				if ((currentMode == MM_ISOTROPIC) || (currentMode == MM_ANISOTROPIC))
+				{
+					SetWindowExtEx(hdc, xWinExt, yWinExt, NULL);
+					SetViewportExtEx(hdc, xViewExt, yViewExt, NULL);
+				}
 
 				b->Paint(hdc);
-				panelMenu->Paint(hdc);
+				//panelMenu->Paint(hdc, xViewExt, yViewExt, xWinExt, yWinExt);
 			}
-		}
+		}*/
 		
 		break;
 	}
 	case WM_MBUTTONDOWN:
 	{
-		HDC hdc = GetDC(hWnd);
+		/*HDC hdc = GetDC(hWnd);
+		SetMapMode(hdc, currentMode);
+		if ((currentMode == MM_ISOTROPIC) || (currentMode == MM_ANISOTROPIC))
+		{
+			SetWindowExtEx(hdc, xWinExt, yWinExt, NULL);
+			SetViewportExtEx(hdc, xViewExt, yViewExt, NULL);
+		}
+
 		x = LOWORD(lParam); //узнаём координаты
 		y = HIWORD(lParam);
 
-		if (x > 140)
+		if (x > WIDTH_PANEL_MENU)
 		{
 			sight->TurnOn();
 			sight->SetCoordDown(x, y);
-		}
+		}*/
 
 		break;
 	}
 	case WM_MBUTTONUP:
 	{
-						 sight->TurnOff();
-						 break;
+		 /*sight->TurnOff();*/
+		 break;
 	}
 	case WM_DESTROY:
 	{
-		delete[] a;
+		/*delete[] a;
 		delete[] b;
-		delete panelMenu;
+		delete[] sight;
+		delete workspace;*/
+		//delete panelMenu;
 		PostQuitMessage(NULL); // отправляем WinMain() сообщение WM_QUIT
 		break;
 	}

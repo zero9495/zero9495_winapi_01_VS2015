@@ -12,10 +12,14 @@ public:
 
 	void Paint(const HDC& hdc) const;
 	void ChangeDirection(const int& x1, const int& y1);
+	POINT GetDirection();
 
 private:
 	int dirX;
 	int dirY;
+
+	int CenterX;
+	int CenterY;
 };
 
 Arrows::Arrows(
@@ -25,10 +29,13 @@ Arrows::Arrows(
 		RGB(255, 255, 255),
 		givenCenterX,
 		givenCenterY,
-		30,	30)
+		40,	40)
 {	
 	dirX = 3;
 	dirY = 6;
+
+	CenterX = givenCenterX;
+	CenterY = givenCenterY;
 }
 
 Arrows::~Arrows()
@@ -95,9 +102,9 @@ void Arrows::Paint(const HDC& hdc) const
 
 void Arrows::ChangeDirection(const int& x1, const int& y1)
 {
-	if (x1 > 45)
+	if (x1 > CenterX)
 	{
-		if (y1 > 300)
+		if (y1 > CenterY)
 		{
 			dirX = 3;
 			dirY = 6;
@@ -110,7 +117,7 @@ void Arrows::ChangeDirection(const int& x1, const int& y1)
 	}
 	else
 	{
-		if (y1 > 300)
+		if (y1 > CenterY)
 		{
 			dirX = 9;
 			dirY = 6;
@@ -121,4 +128,12 @@ void Arrows::ChangeDirection(const int& x1, const int& y1)
 			dirY = 12;
 		}
 	}
+}
+
+POINT Arrows::GetDirection()
+{
+	POINT direction;
+	direction.x = dirX;
+	direction.y = dirY;
+	return direction;
 }

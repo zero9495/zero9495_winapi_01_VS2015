@@ -94,7 +94,7 @@ void ListFigure::AddElemToEnd(const ListFigure* a)
 
 	while (t)
 	{
-		this->AddElemToEnd(t->data);
+		AddElemToEnd(t->data);
 		t = t->next;
 	}
 }
@@ -140,19 +140,7 @@ void ListFigure::Paint(const HDC& hdc) const
 	{
 		t->data->Paint(hdc);
 		t = t->next;
-	}
-
-	HPEN hPen = CreatePen(PS_SOLID, 1, RGB(40, 57, 60));
-	SelectObject(hdc, hPen);
-
-	Rectangle(hdc, -50, -50, 50, 50);
-
-	MoveToEx(hdc, 0, 0, NULL);
-	LineTo(hdc, 0, 10);
-	MoveToEx(hdc, 0, 0, NULL);
-	LineTo(hdc, 10, 0);
-
-	DeleteObject(hPen);
+	}	
 }
 
 void ListFigure::Clear()

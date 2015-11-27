@@ -11,25 +11,21 @@ public:
 	PanelMenu(int cyClient);
 	~PanelMenu();
 
-	void OnMenuDOWN(
-		ListFigure* a,
-		ListFigure* b,
-		int& xWindow,
+	int OnSetMapModeDOWN(int& xWindow,
 		int& yWindow,
 		const int& posX,
 		const int& posY,
 		const HDC& hdc);
-	void OnMenuMOVE(
-		ListFigure* b,
-		int& xWindow,
-		int& yWindow,
-		int& cxClient, 
-		int& cyClient,
+	POINT OnChangeDirectionDOWN(
+		const int& posX,
+		const int& posY,
+		const HDC& hdc);
+	int OnMenuMOVE(
 		const int& posX,
 		const int& posY,
 		const HDC& hdc);
 	void OnMenuUP();
-	void Paint(const HDC& hdc) const;
+	void PanelMenu::Paint(const HDC& hdc) const;
 	void AddButton(const MyButton& button);
 	void SetCYClient(const int& cyClient);
 
@@ -38,8 +34,8 @@ private:
 	ButtonWithText* isotr;
 	ButtonWithText* anisotr;
 	Arrows* arrows;
-	Sight* sight;
 	MyRectangle* rect;
+	MyRectangle* smallRect;
 
 	COLORREF Brush = RGB(40, 57, 60);
 	COLORREF Pen = RGB(40, 57, 60);
@@ -54,12 +50,12 @@ PanelMenu::PanelMenu() : PanelMenu(1000)
 PanelMenu::PanelMenu(int cyClient)
 {
 	txt = new ButtonWithText(70, 50, "MM_TEXT");
-	//txt->TurnOn();
+	txt->TurnOn();
 	isotr = new ButtonWithText(70, 100, "MM_ISOTROPIC");
 	anisotr = new ButtonWithText(70, 150, "MM_ANISOTROPIC");
-	arrows = new Arrows(35, 300);
-	sight = new Sight(100, 300);
+	arrows = new Arrows(70, 220);
 	rect = new MyRectangle(Pen, Brush, 0, 0, 140, cyClient);
+	smallRect = new MyRectangle(Pen, RGB(0,0,0), 40, 190, 100, 250);
 }
 
 PanelMenu::~PanelMenu()
@@ -67,12 +63,11 @@ PanelMenu::~PanelMenu()
 	delete txt;
 	delete isotr;
 	delete anisotr;
+	delete rect;
+	delete smallRect;
 }
 
-void PanelMenu::OnMenuDOWN(
-	ListFigure* a,
-	ListFigure* b,
-	int& xWindow,
+int PanelMenu::OnSetMapModeDOWN(int& xWindow,
 	int& yWindow,
 	const int& posX,
 	const int& posY,
@@ -81,57 +76,52 @@ void PanelMenu::OnMenuDOWN(
 	if (txt->IsOnButton(posX, posY))
 	{
 		SetMapMode(hdc, MM_TEXT);
-		SetViewportOrgEx(hdc, xWindow, yWindow, NULL);
-		ListFigure* t = new ListFigure(*a);
-		b->AddElemToEnd(t);
-		b->Paint(hdc);
 
 		txt->TurnOn();
 		isotr->TurnOff();
 		anisotr->TurnOff();
+
+		return MM_TEXT;
 	}
 	else if (isotr->IsOnButton(posX, posY))
 	{
 		SetMapMode(hdc, MM_ISOTROPIC);
-		SetViewportOrgEx(hdc, xWindow, yWindow, NULL);
-		ListFigure* t = new ListFigure(*a);
-		b->AddElemToEnd(t);
-		b->Paint(hdc);
 
 		txt->TurnOff();
 		isotr->TurnOn();
 		anisotr->TurnOff();
+
+		return MM_ISOTROPIC;
 	}
 	else if (anisotr->IsOnButton(posX, posY))
 	{
 		SetMapMode(hdc, MM_ANISOTROPIC);
-		SetViewportOrgEx(hdc, xWindow, yWindow, NULL);
-		ListFigure* t = new ListFigure(*a);
-		b->AddElemToEnd(t);
-		b->Paint(hdc);
 
 		txt->TurnOff();
 		isotr->TurnOff();
 		anisotr->TurnOn();
+
+		return MM_ANISOTROPIC;
 	}
-	else if (arrows->IsOnButton(posX, posY))
+
+	return 0;
+}
+
+POINT PanelMenu::OnChangeDirectionDOWN(
+	const int& posX,
+	const int& posY,
+	const HDC& hdc)
+{	
+	if (arrows->IsOnButton(posX, posY))
 	{
 		arrows->TurnOn();
 		arrows->ChangeDirection(posX, posY);
 	}
-	else if (sight->IsOnButton(posX, posY))
-	{
-		sight->TurnOn();
-		sight->SetCoordDown(posX, posY);
-	}
+
+	return arrows->GetDirection();
 }
 
-void PanelMenu::OnMenuMOVE(
-	ListFigure* b,
-	int& xWindow,
-	int& yWindow,
-	int& cxClient,
-	int& cyClient,
+int PanelMenu::OnMenuMOVE(
 	const int& posX,
 	const int& posY,
 	const HDC& hdc)
@@ -139,53 +129,24 @@ void PanelMenu::OnMenuMOVE(
 	if (arrows->GetState())
 	{
 		arrows->ChangeDirection(posX, posY);
-		arrows->Paint(hdc);
+		return 1;
 	}
-	else if (sight->GetState())
-	{
-		sight->ChangeSight(xWindow, yWindow, posX, posY);
-		SetViewportOrgEx(hdc, xWindow, yWindow, NULL);
-
-		HBRUSH hBrush = CreateSolidBrush(RGB(255, 255, 255));
-		HPEN hPen = CreatePen(PS_SOLID, 1, RGB(255, 255, 255));
-		SelectObject(hdc, hBrush);
-		SelectObject(hdc, hPen);
-
-		Rectangle(hdc, 140 - xWindow, -yWindow, cxClient, cyClient);
-		
-		DeleteObject(hBrush);
-		DeleteObject(hPen);
-
-		b->Paint(hdc);
-		Paint(hdc);
-	}
+	return 0;
 }
 
 void PanelMenu::OnMenuUP()
 {
 	arrows->TurnOff();
-	sight->TurnOff();
 }
 
 void PanelMenu::Paint(const HDC& hdc) const
 {
-	int k = GetMapMode(hdc);
-	POINT FAR* lppt = new POINT FAR;
-	GetViewportOrgEx(hdc, lppt);
-	SetViewportOrgEx(hdc, 0, 0, NULL);
-
-	SetMapMode(hdc, MM_TEXT);
-	
 	rect->Paint(hdc);
 	txt->Paint(hdc);
 	isotr->Paint(hdc);
 	anisotr->Paint(hdc);
+	smallRect->Paint(hdc);
 	arrows->Paint(hdc);
-	//sight->Paint(hdc);
-
-	SetViewportOrgEx(hdc, lppt->x, lppt->y, NULL);
-	SetMapMode(hdc, k);	
-	delete lppt;
 }
 
 void PanelMenu::AddButton(const MyButton& button)

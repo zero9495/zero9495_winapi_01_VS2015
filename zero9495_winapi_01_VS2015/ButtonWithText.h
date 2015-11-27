@@ -7,7 +7,7 @@ public:
 	ButtonWithText(
 		const int& givenCenterX,
 		const int& givenCenterY,
-		const char* givenStr,
+		const TCHAR* givenStr,
 		const int& givenHeight,
 		const int& givenWidth);
 	~ButtonWithText();
@@ -15,7 +15,7 @@ public:
 	void Paint(const HDC& hdc) const;
 
 private:
-	char* str;
+	TCHAR* str;
 
 	COLORREF textColorOn = RGB(238, 238, 238);
 	COLORREF textColorOff = RGB(145, 153, 166);
@@ -24,7 +24,7 @@ private:
 ButtonWithText::ButtonWithText(
 	const int& givenCenterX,
 	const int& givenCenterY,
-	const char* givenStr,
+	const TCHAR* givenStr,
 	const int& givenHeight = 50,
 	const int& givenWidth = 140) : MyButton(
 		RGB(40, 57, 60),
@@ -37,7 +37,7 @@ ButtonWithText::ButtonWithText(
 
 
 	int lengthStr = strlen(givenStr);
-	str = new char[lengthStr + 1];
+	str = new TCHAR[lengthStr + 1];
 	strcpy_s(str, lengthStr + 1, givenStr);
 }
 

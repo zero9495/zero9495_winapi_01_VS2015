@@ -15,7 +15,7 @@ public:
 		const int& givenCenterY,
 		const int& givenHeight,
 		const int& givenWidth);
-	~MyButton();
+	virtual ~MyButton();
 
 	void TurnOn();
 	void TurnOff();
@@ -127,8 +127,9 @@ COLORREF MyButton::GetPen() const
 
 bool MyButton::IsOnButton(const int& givenx, const int& giveny) const
 {
-	if ((centerY - height / 2 < giveny) && (giveny < centerY + height / 2) &&
-		(centerX - width / 2 < givenx) && (givenx < centerX + width / 2))
+	/*if ((centerX - width / 2 < givenx) && (givenx < centerX + width / 2) &&
+		(centerY - height / 2 < giveny) && (giveny < centerY + height / 2))*/
+	if (fillButton->IsOnButton(givenx, giveny))		
 	{
 		return true;
 	}
